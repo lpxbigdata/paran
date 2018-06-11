@@ -101,10 +101,8 @@ class pagerank:
                     line = np.load('small_data_test/mid/blocks_%d_%d' % (src, item))
                     di = line[0]
                     destList = [nodes for nodes in line[1:]]
-                    print('src:',src,'destList',destList)
                     for k in destList:
                         r_new[k % self.basketsize ] += beta * r_old[src % self.basketsize] / di
-                        print('item: %d ,r_new[%d] += beta * %f / di'%(item,k,r_old[src % self.basketsize]))
                 np.save('small_data_test/newr/newr_%d.npy' % item, r_new)
                 ro = np.load('small_data_test/oldr/oldr_%d.npy' % item)
                 #print('for e:r_new',r_new,'r_old:',r_old)
@@ -127,10 +125,12 @@ class pagerank:
         fout=open(self.resultDataPath,'wb')
         print('x%a'%x)
         print('self.top%d'%self.top)
+        re=[]
         for i in range(self.top):
             l1=mapor.get(temp[i]) # nodeid
+            re.append([int(l1),score[i]])
             print('nodeid: %d   score[%d]: %f'%(l1,i,score[i]))
-            #fout(str(l1)+" "+str(score[i]))
+        np.savetxt("small_data_test/result.txt",re, fmt="%d %f")
         fout.close()
 
 

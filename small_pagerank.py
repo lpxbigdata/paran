@@ -41,47 +41,46 @@ class pagerank:
     def sort_data(self):
         mapor = pickle.load(open('small_data_test/mid/maprev.txt', 'rb'))
         originData = np.loadtxt(self.originDataPath, dtype='int')
-        fout=open(self.sortedDataPath,'w')
+        dist=[]
         for i in range(originData.shape[0]):
             tmp = originData[i]
             l1=mapor.get(tmp[0])
             l2 = mapor.get(tmp[1])
-            fout.write(str(l1)+" "+str(l2)+'\n')
+            dist.append([l1,l2])
+        np.savetxt(self.sortedDataPath,dist)
 
     def to_blockmatrix(self):
         sortedData=np.loadtxt(self.sortedDataPath,dtype='int')
         # sortedData是源文件转换成映射的
         # sortedData.shape[0]代表行数
-        first = True
-        tar = []
+        dist = []
         for i in range(sortedData.shape[0]):
             tmp = sortedData[i] #tmp是一个1*2的数组 [from to]
             if i == sortedData.shape[0]-1:
-                tar.append(tmp[1])
-                degree = len(tar)
+                dist.append(tmp[1])
+                degree = len(dist)
                 blocks = [[degree] for _ in range(self.basketnum)]
-                for item in tar:
+                for item in dist:
                     blocks[int(item / self.basketsize)].append(item)
-                print('tar:%a  i:%d  blocks:%a'%(tar,i,blocks))
+                print('dist:%a  i:%d  blocks:%a'%(dist,i,blocks))
                 for bas in range(self.basketnum):
                     if len(blocks[bas]) > 1:
-                        pickle.dump(blocks[bas], open('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas), 'wb'))
-                        # 被存储到blocks_from_tar块号
-                tar=[]
+                        np.save(('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas)),blocks[bas])
+                dist=[]
             elif sortedData[i+1,0] != sortedData[i,0]:
-                tar.append(tmp[1])
-                degree = len(tar)
-                blocks = [[degree] for _ in range(self.basketnum)]# 不要浅拷贝！！！
-                for item in tar:
+                dist.append(tmp[1])
+                degree = len(dist)
+                blocks = [[degree] for _ in range(self.basketnum)]
+                for item in dist:
                     blocksid=int(item / self.basketsize)
                     blocks[blocksid].append(item)
-                print('tar:%a  i:%d  blocks:%a'%(tar,i,blocks))
+                print('dist:%a  i:%d  blocks:%a'%(dist,i,blocks))
                 for bas in range(self.basketnum):
                     if len(blocks[bas]) > 1:
-                        pickle.dump(blocks[bas], open('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas), 'wb'))#第一个是from第二个是块
-                tar=[]
+                        np.save(('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas)), blocks[bas])
+                dist=[]
             else:
-                tar.append(tmp[1])
+                dist.append(tmp[1])
 
     def generate_top(self):
         for item in range(self.basketnum):
@@ -99,17 +98,14 @@ class pagerank:
                     if not os.path.exists('small_data_test/mid/blocks_%d_%d' % (src, item)):
                         continue
                     r_old = np.load('small_data_test/oldr/oldr_%d.npy' % (int(src/self.basketsize)))
-                    line = pickle.load(open('small_data_test/mid/blocks_%d_%d' % (src, item), 'rb'))
+                    line = np.load('small_data_test/mid/blocks_%d_%d' % (src, item))
                     di = line[0]
                     destList = [nodes for nodes in line[1:]]
                     print('src:',src,'destList',destList)
                     for k in destList:
-                        #print('k:%d  src除self.basketsize取余:%d'%(k,src % self.basketsize))
-                        #r_new[k] += beta * r_old[src % self.basketsize] / di
                         r_new[k % self.basketsize ] += beta * r_old[src % self.basketsize] / di
                         print('item: %d ,r_new[%d] += beta * %f / di'%(item,k,r_old[src % self.basketsize]))
                 np.save('small_data_test/newr/newr_%d.npy' % item, r_new)
-
                 ro = np.load('small_data_test/oldr/oldr_%d.npy' % item)
                 #print('for e:r_new',r_new,'r_old:',r_old)
                 e += np.linalg.norm((np.array(r_new) - np.array(ro)), ord=1)        # L1 norm

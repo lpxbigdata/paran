@@ -11,15 +11,11 @@ class pagerank:
         self.resultDataPath = 'small_data_test/test_result.txt'
         self.top=top
         self.beta=beta
+        self.basketsize = basketsize
         self.nodes = self.read_file()
-        self.basketsize=basketsize
         self.basketnum=int(math.ceil(float(len(self.nodes)) / basketsize))
-        print(
-            self.basketnum
-        )
         self.nodenum=self.sort_node()
-        print('nodenum%d'%self.nodenum)
-        self.sort_data()
+        self.map_data()
         self.to_blockmatrix()
         self.generate_top()
 
@@ -27,6 +23,7 @@ class pagerank:
         originData = np.loadtxt(self.originDataPath,dtype='int')
         nodes = np.hstack((originData[:, 0],originData[:, 1]))
         nodes = np.unique(nodes)
+        nodes.sort()
         return nodes
 
     def sort_node(self):
@@ -34,54 +31,49 @@ class pagerank:
         index = [i for i in range(nodenum)]
         map = dict(zip(index, self.nodes))
         maprev=dict(zip(self.nodes, index))
-        pickle.dump(map, open('small_data_test/mid/mapor.txt', 'wb+'))
-        pickle.dump(maprev, open('small_data_test/mid/maprev.txt', 'wb+'))
+        np.savez("small_data_test/mid/mapor.txt",map)
+        np.savez("small_data_test/mid/maprev.txt", maprev)
         return nodenum
 
-    def sort_data(self):
-        mapor = pickle.load(open('small_data_test/mid/maprev.txt', 'rb'))
+    def map_data(self):
+        mapor = np.load("small_data_test/mid/maprev.txt")
         originData = np.loadtxt(self.originDataPath, dtype='int')
-        fout=open(self.sortedDataPath,'w')
+        dist=[]
         for i in range(originData.shape[0]):
             tmp = originData[i]
             l1=mapor.get(tmp[0])
             l2 = mapor.get(tmp[1])
-            fout.write(str(l1)+" "+str(l2)+'\n')
+            dist.append([l1,l2])
+        np.savetxt(self.sortedDataPath ,dist)
 
     def to_blockmatrix(self):
         sortedData=np.loadtxt(self.sortedDataPath,dtype='int')
-        # sortedData是源文件转换成映射的
-        # sortedData.shape[0]代表行数
-        first = True
-        tar = []
+        dist = []
         for i in range(sortedData.shape[0]):
-            tmp = sortedData[i] #tmp是一个1*2的数组 [from to]
+            tmp = sortedData[i] 
             if i == sortedData.shape[0]-1:
-                tar.append(tmp[1])
-                degree = len(tar)
+                dist.append(tmp[1])
+                degree = len(dist)
                 blocks = [[degree] for _ in range(self.basketnum)]
-                for item in tar:
+                for item in dist:
                     blocks[int(item / self.basketsize)].append(item)
-                print('tar:%a  i:%d  blocks:%a'%(tar,i,blocks))
                 for bas in range(self.basketnum):
                     if len(blocks[bas]) > 1:
                         pickle.dump(blocks[bas], open('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas), 'wb'))
-                        # 被存储到blocks_from_tar块号
-                tar=[]
+                dist=[]
             elif sortedData[i+1,0] != sortedData[i,0]:
-                tar.append(tmp[1])
-                degree = len(tar)
-                blocks = [[degree] for _ in range(self.basketnum)]# 不要浅拷贝！！！
-                for item in tar:
+                dist.append(tmp[1])
+                degree = len(dist)
+                blocks = [[degree] for _ in range(self.basketnum)]
+                for item in dist:
                     blocksid=int(item / self.basketsize)
                     blocks[blocksid].append(item)
-                print('tar:%a  i:%d  blocks:%a'%(tar,i,blocks))
                 for bas in range(self.basketnum):
                     if len(blocks[bas]) > 1:
-                        pickle.dump(blocks[bas], open('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas), 'wb'))#第一个是from第二个是块
-                tar=[]
+                        pickle.dump(blocks[bas], open('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas), 'wb'))
+                dist=[]
             else:
-                tar.append(tmp[1])
+                dist.append(tmp[1])
 
     def generate_top(self):
         for item in range(self.basketnum):
@@ -91,22 +83,16 @@ class pagerank:
             f.close()
         while True:
             e = 0
-            # item 块
-            #print('self.nodenum:%d'%self.nodenum)
-            for item in range(self.basketnum): #to的分块
-                #一块里r_new值
+            for item in range(self.basketnum):
                 r_new = np.array([(1.0 - beta) / self.nodenum for _ in range(self.basketsize)])
-                for src in range(self.nodenum): #src是from
+                for src in range(self.nodenum):
                     if not os.path.exists('small_data_test/mid/blocks_%d_%d' % (src, item)):
                         continue
                     r_old = pickle.load(open('small_data_test/rold/rold_%d' % (int(src/self.basketsize)), 'rb'))
                     line = pickle.load(open('small_data_test/mid/blocks_%d_%d' % (src, item), 'rb'))
                     di = line[0]
                     destList = [nodes for nodes in line[1:]]
-                    print('src:',src,'destList',destList)
                     for k in destList:
-                        #print('k:%d  src除self.basketsize取余:%d'%(k,src % self.basketsize))
-                        #r_new[k] += beta * r_old[src % self.basketsize] / di
                         r_new[k % self.basketsize ] += beta * r_old[src % self.basketsize] / di
                         print('item: %d ,r_new[%d] += beta * %f / di'%(item,k,r_old[src % self.basketsize]))
                 f = open('small_data_test/rold/rnew_%d' % item, 'wb')
@@ -114,7 +100,6 @@ class pagerank:
                 f.close()
 
                 ro = pickle.load(open('small_data_test/rold/rold_%d' % item, 'rb'))
-                #print('for e:r_new',r_new,'r_old:',r_old)
                 e += np.linalg.norm((np.array(r_new) - np.array(ro)), ord=1)        # L1 norm
             print('e%f'%e)
 
@@ -126,11 +111,11 @@ class pagerank:
                     for i in r:
                         x.append(i)
                         x = x[:self.nodenum]
-                temp=sorted(range(len(x)), key=lambda i: x[i], reverse=True)[:self.top]#前self.top的编号
-                score=sorted(x,reverse=True)[:self.top];
+                temp=sorted(range(len(x)), key=lambda i: x[i], reverse=True)[:self.top]#old self.top number
+                score=sorted(x,reverse=True)[:self.top]
                 mapor = pickle.load(open('small_data_test/mid/mapor.txt', 'rb'))
                 fout=open(self.resultDataPath,'wb')
-                print('x%a'%x)
+                print(x)
                 print('self.top%d'%self.top)
                 for i in range(self.top):
                     l1=mapor.get(temp[i]) # nodeid

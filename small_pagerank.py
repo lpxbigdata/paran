@@ -85,31 +85,38 @@ class pagerank:
 
     def generate_top(self):
         for item in range(self.basketnum):
-            r = [(1.0 - beta) / (self.nodenum) for _ in range(self.basketsize)]
+            r = [ 1.0 / (self.nodenum) for _ in range(self.basketsize)]
             f = open('small_data_test/rold/rold_%d' % item, 'wb')
             pickle.dump(r, f)
             f.close()
         while True:
             e = 0
-            #所有r_new值
-            r_new = [(1.0 - beta) / (self.nodenum) for _ in range(self.nodenum)]
             # item 块
             #print('self.nodenum:%d'%self.nodenum)
-            for item in range(self.basketnum):
-                #一块里所有r_old值
-                r_old = pickle.load(open('small_data_test/rold/rold_%d' % item, 'rb'))
-                for src in range(item*self.basketsize,(item+1)*self.basketsize): #src是from
+            for item in range(self.basketnum): #to的分块
+                #一块里r_new值
+                r_new = np.array([(1.0 - beta) / self.nodenum for _ in range(self.basketsize)])
+                for src in range(self.nodenum): #src是from
                     if not os.path.exists('small_data_test/mid/blocks_%d_%d' % (src, item)):
                         continue
+                    r_old = pickle.load(open('small_data_test/rold/rold_%d' % (int(src/self.basketsize)), 'rb'))
                     line = pickle.load(open('small_data_test/mid/blocks_%d_%d' % (src, item), 'rb'))
                     di = line[0]
                     destList = [nodes for nodes in line[1:]]
+                    print('src:',src,'destList',destList)
                     for k in destList:
                         #print('k:%d  src除self.basketsize取余:%d'%(k,src % self.basketsize))
-                        r_new[k] += beta * r_old[src % self.basketsize] / di
-                rn=r_new[item*self.basketsize:(item+1)*self.basketsize]
-                e += np.linalg.norm((np.array(rn) - np.array(r_old)), ord=1)        # L1 norm
-            #print('e%f'%e)
+                        #r_new[k] += beta * r_old[src % self.basketsize] / di
+                        r_new[k % self.basketsize ] += beta * r_old[src % self.basketsize] / di
+                        print('item: %d ,r_new[%d] += beta * %f / di'%(item,k,r_old[src % self.basketsize]))
+                f = open('small_data_test/rold/rnew_%d' % item, 'wb')
+                pickle.dump(r_new, f)
+                f.close()
+
+                ro = pickle.load(open('small_data_test/rold/rold_%d' % item, 'rb'))
+                #print('for e:r_new',r_new,'r_old:',r_old)
+                e += np.linalg.norm((np.array(r_new) - np.array(ro)), ord=1)        # L1 norm
+            print('e%f'%e)
 
             if e < 1e-6:
                 # print result
@@ -131,18 +138,13 @@ class pagerank:
                 fout.close()
                 return
 
-            for item in range(self.basketnum):
-                f = open('small_data_test/rold/rnew_%d' % item, 'wb')
-                pickle.dump(r_new[item*self.basketsize:(item+1)*self.basketsize], f)
-                f.close()
-
             for i in range(self.basketnum):
                 rn = pickle.load(open('small_data_test/rold/rnew_%d' % i, 'rb'))
                 pickle.dump(rn, open('small_data_test/rold/rold_%d' % i, 'wb'))
 
 
 if __name__ == '__main__':
-    top = 2
+    top = 3
     beta = 0.85
-    basketsize=2
+    basketsize= 2
     p = pagerank(top, beta,basketsize)

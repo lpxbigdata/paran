@@ -6,9 +6,9 @@ import os
 class pagerank:
 
     def __init__(self,top,beta,basketsize):
-        self.originDataPath = 'small_data_test/test_input1.txt'
-        self.sortedDataPath = 'small_data_test/mappedtest_input1.txt'
-        self.resultDataPath = 'small_data_test/test_result.txt'
+        self.originDataPath = 'data/test_input1.txt'
+        self.sortedDataPath = 'data/mappedtest_input1.txt'
+        self.resultDataPath = 'data/test_result.txt'
         self.top=top
         self.beta=beta
         self.nodes = self.read_file()
@@ -34,12 +34,12 @@ class pagerank:
         index = [i for i in range(nodenum)]
         map = dict(zip(index, self.nodes))
         maprev=dict(zip(self.nodes, index))
-        pickle.dump(map, open('small_data_test/mid/mapor.txt', 'wb+'))
-        pickle.dump(maprev, open('small_data_test/mid/maprev.txt', 'wb+'))
+        pickle.dump(map, open('data/mid/mapor.txt', 'wb+'))
+        pickle.dump(maprev, open('data/mid/maprev.txt', 'wb+'))
         return nodenum
 
     def sort_data(self):
-        mapor = pickle.load(open('small_data_test/mid/maprev.txt', 'rb'))
+        mapor = pickle.load(open('data/mid/maprev.txt', 'rb'))
         originData = np.loadtxt(self.originDataPath, dtype='int')
         dist=[]
         for i in range(originData.shape[0]):
@@ -65,7 +65,7 @@ class pagerank:
                 print('dist:%a  i:%d  blocks:%a'%(dist,i,blocks))
                 for bas in range(self.basketnum):
                     if len(blocks[bas]) > 1:
-                        np.save(('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas)),blocks[bas])
+                        np.save(('data/mid/blocks_%d_%d' % (tmp[0], bas)),blocks[bas])
                 dist=[]
             elif sortedData[i+1,0] != sortedData[i,0]:
                 dist.append(tmp[1])
@@ -77,7 +77,7 @@ class pagerank:
                 print('dist:%a  i:%d  blocks:%a'%(dist,i,blocks))
                 for bas in range(self.basketnum):
                     if len(blocks[bas]) > 1:
-                        np.save(('small_data_test/mid/blocks_%d_%d' % (tmp[0], bas)), blocks[bas])
+                        np.save(('data/mid/blocks_%d_%d' % (tmp[0], bas)), blocks[bas])
                 dist=[]
             else:
                 dist.append(tmp[1])
@@ -85,7 +85,7 @@ class pagerank:
     def generate_top(self):
         for item in range(self.basketnum):
             r = [ 1.0 / (self.nodenum) for _ in range(self.basketsize)]
-            np.save('small_data_test/oldr/oldr_%d.npy' % item, r)
+            np.save('data/oldr/oldr_%d.npy' % item, r)
         e = 1
         while e > 1e-7:
             e = 0
@@ -95,33 +95,33 @@ class pagerank:
                 #一块里r_new值
                 r_new = np.array([(1.0 - beta) / self.nodenum for _ in range(self.basketsize)])
                 for src in range(self.nodenum): #src是from
-                    if not os.path.exists('small_data_test/mid/blocks_%d_%d' % (src, item)):
+                    if not os.path.exists('data/mid/blocks_%d_%d' % (src, item)):
                         continue
-                    r_old = np.load('small_data_test/oldr/oldr_%d.npy' % (int(src/self.basketsize)))
-                    line = np.load('small_data_test/mid/blocks_%d_%d' % (src, item))
+                    r_old = np.load('data/oldr/oldr_%d.npy' % (int(src/self.basketsize)))
+                    line = np.load('data/mid/blocks_%d_%d' % (src, item))
                     di = line[0]
                     destList = [nodes for nodes in line[1:]]
                     for k in destList:
                         r_new[k % self.basketsize ] += beta * r_old[src % self.basketsize] / di
-                np.save('small_data_test/newr/newr_%d.npy' % item, r_new)
-                ro = np.load('small_data_test/oldr/oldr_%d.npy' % item)
+                np.save('data/newr/newr_%d.npy' % item, r_new)
+                ro = np.load('data/oldr/oldr_%d.npy' % item)
                 #print('for e:r_new',r_new,'r_old:',r_old)
                 e += np.linalg.norm((np.array(r_new) - np.array(ro)), ord=1)        # L1 norm
             print('e%f'%e)
             for i in range(self.basketnum):
-                rn = np.load('small_data_test/newr/newr_%d.npy' % i)
-                np.save('small_data_test/oldr/oldr_%d.npy' % i, rn)
+                rn = np.load('data/newr/newr_%d.npy' % i)
+                np.save('data/oldr/oldr_%d.npy' % i, rn)
 
         # print result
         x = []
         for i in range(self.basketnum):
-            r = np.load('small_data_test/newr/newr_%d.npy' % i)
+            r = np.load('data/newr/newr_%d.npy' % i)
             for i in r:
                 x.append(i)
                 x = x[:self.nodenum]
         temp=sorted(range(len(x)), key=lambda i: x[i], reverse=True)[:self.top]#前self.top的编号
         score=sorted(x,reverse=True)[:self.top];
-        mapor = pickle.load(open('small_data_test/mid/mapor.txt', 'rb'))
+        mapor = pickle.load(open('data/mid/mapor.txt', 'rb'))
         fout=open(self.resultDataPath,'wb')
         print('x%a'%x)
         print('self.top%d'%self.top)
@@ -130,7 +130,7 @@ class pagerank:
             l1=mapor.get(temp[i]) # nodeid
             re.append([int(l1),score[i]])
             print('nodeid: %d   score[%d]: %f'%(l1,i,score[i]))
-        np.savetxt("small_data_test/result.txt",re, fmt="%d %f")
+        np.savetxt("data/result.txt",re, fmt="%d %f")
         fout.close()
 
 
